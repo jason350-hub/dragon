@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>金融理財填字接龍王 - 全班投屏小組競賽系統</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Tone.js for Sound Effects -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+  <!-- Canvas Confetti for Celebration -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&display=swap');
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      user-select: none;
+    }
+    /* Crossword Cell Animations */
+    .cell-glow {
+      box-shadow: 0 0 16px rgba(245, 158, 11, 0.75);
+    }
+    .cell-correct {
+      animation: popIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+    @keyframes popIn {
+      0% { transform: scale(0.6); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    /* Custom Scrollbar for Projector Display */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #1e293b;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #64748b;
+    }
+  </style>
+</head>
+
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between overflow-x-hidden selection:bg-amber-500 selection:text-black">
+
+  <!-- 頂部高對比狀態面板 (大螢幕專用) -->
+  <header class="bg-slate-900/90 border-b border-slate-800 backdrop-blur sticky top-0 z-40 px-5 py-3 shadow-xl">
+    <div class="max-w-[1920px] mx-auto flex flex-wrap items-center justify-between gap-4">
+      
+      <!-- Logo 與關卡主題標題 -->
+      <div class="flex items-center space-x-3.5">
+        <div class="w-12 h-12 bg-gradient-to-tr from-amber-500 via-yellow-400 to-amber-200 rounded-2xl flex items-center justify-center text-slate-950 font-black text-2xl shadow-lg shadow-amber-500/30">
+          <i class="fas fa-th-large"></i>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2.5">
+            <h1 class="text-xl md:text-2xl font-black tracking-wide text-white">金融理財填字接龍王</h1>
+            <span id="levelBadge" class="bg-emerald-500/20 text-emerald-300 text-xs px-2.5 py-0.5 rounded-full font-bold border border-emerald-500/40">
+              關卡一：第五冊第五課・公民與理財經典版
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">大螢幕課堂投屏・小組搶答積分・雙向格字同步連線</p>
+        </div>
+      </div>
+
+      <!-- 關卡切換、計時器與控制工具列 -->
+      <div class="flex items-center space-x-3">
+        <!-- 題庫關卡切換選單 -->
+        <div class="bg-slate-800/90 border border-slate-700 px-3 py-1.5 rounded-xl flex items-center space-x-2 text-xs">
+          <span class="text-slate-400 font-bold">切換題庫：</span>
+          <select id="levelSelector" onchange="switchLevel(this.value)" class="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-amber-300 font-bold focus:outline-none focus:border-amber-400">
+            <option value="lesson5">第 1 關：第五課公民經典版 (依學習單)</option>
+            <option value="advanced_finance">第 2 關：現代金融與投資工具挑戰版</option>
+            <option value="fraud_and_risk">第 3 關：投資風險、理財工具與防詐陷阱挑戰版</option>
+          </select>
+        </div>
+
+        <!-- 課堂搶答倒數計時器 -->
+        <div class="flex items-center space-x-2 bg-slate-800/90 px-3.5 py-1.5 rounded-xl border border-slate-700">
+          <button onclick="toggleTimer()" id="timerControlBtn" class="text-emerald-400 hover:text-emerald-300 transition text-sm">
+            <i id="timerIcon" class="fas fa-play"></i>
+          </button>
+          <span class="text-xs text-slate-400 font-medium">搶答倒數:</span>
+          <span id="timerDisplay" class="font-mono text-base font-black text-amber-300 w-12 text-center">30s</span>
+          <button onclick="resetTimer(30)" class="text-slate-400 hover:text-slate-200 text-xs" title="重置30秒">
+            <i class="fas fa-rotate-right"></i>
+          </button>
+        </div>
+
+        <!-- 音效切換 -->
+        <button onclick="toggleSound()" id="soundToggleBtn" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="切換音效">
+          <i id="soundIcon" class="fas fa-volume-up"></i>
+        </button>
+
+        <!-- 全螢幕切換 -->
+        <button onclick="toggleFullScreen()" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="全螢幕切換">
+          <i class="fas fa-expand"></i>
+        </button>
+
+        <!-- 一鍵重置盤面 -->
+        <button onclick="confirmResetBoard()" class="px-3.5 py-2 rounded-xl bg-rose-600/80 hover:bg-rose-600 text-white font-bold text-xs transition flex items-center space-x-1.5 shadow">
+          <i class="fas fa-rotate-left"></i>
+          <span>重開本局</span>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- 主畫面容器 (雙欄佈局：左側填字盤面，右側小組計分與提示列表) -->
+  <main class="max-w-[1920px] mx-auto px-4 py-5 w-full flex-1 grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+
+    <!-- 左側/中央：填字遊戲棋盤與操作快捷列 (佔 8 欄) -->
+    <section class="xl:col-span-8 flex flex-col space-y-4">
+      
+      <!-- 當前選取提示橫幅與快速解題操控條 -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
+        <div class="flex items-center space-x-3 w-full md:w-auto">
+          <span id="activeClueBadge" class="bg-amber-500 text-slate-950 font-black text-xs md:text-sm px-3 py-1.5 rounded-xl whitespace-nowrap shadow">
+            橫向 一
+          </span>
+          <div class="overflow-hidden">
+            <p id="activeClueText" class="text-sm md:text-base font-bold text-white truncate max-w-2xl">
+              請點選棋盤格子或右側提示開始作答！
+            </p>
+            <span id="activeClueMeta" class="text-xs text-slate-400 block">
+              詞長：4 個字 ｜ 已填寫：0 / 4
+            </span>
+          </div>
+        </div>
+
+        <!-- 課堂作答互動按鈕組 -->
+        <div class="flex items-center space-x-2 w-full md:w-auto justify-end">
+          <!-- 讓學生在觸控螢幕輸入文字或呼叫注音虛擬小鍵盤 -->
+          <button onclick="openInputModal()" class="px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs md:text-sm transition flex items-center space-x-1.5 shadow">
+            <i class="fas fa-keyboard"></i>
+            <span>小組作答輸入</span>
+          </button>
+
+          <!-- 老師專用：若學生口語搶答答對，直接點擊【認證答對 (+10分)】 -->
+          <button onclick="revealActiveWord(true)" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs md:text-sm transition flex items-center space-x-1.5 shadow-md shadow-emerald-600/30">
+            <i class="fas fa-check-circle"></i>
+            <span>正確得分 (+10)</span>
+          </button>
+
+          <!-- 提示第一個字或全揭示 -->
+          <button onclick="giveHintActiveWord()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 font-bold text-xs transition" title="給予提示字">
+            <i class="fas fa-lightbulb"></i>
+            <span class="hidden sm:inline">提示字</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 填字接龍棋盤主區塊 (自適應高解析度網格) -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-3xl p-4 md:p-6 shadow-2xl flex flex-col items-center justify-center overflow-x-auto min-h-[580px]">
+        <div id="crosswordGrid" class="grid gap-1.5 md:gap-2 p-2 bg-slate-950/60 rounded-2xl border border-slate-800 shadow-inner">
+          <!-- 動態由 JavaScript 生成網格格子 -->
+        </div>
+
+        <!-- 棋盤底部進度條與統計 -->
+        <div class="w-full max-w-2xl mt-4 flex items-center justify-between text-xs text-slate-400">
+          <div class="flex items-center space-x-2">
+            <span>解題進度：</span>
+            <span id="progressText" class="font-bold text-amber-400">0 / 22 題完成</span>
+          </div>
+          <div class="w-48 bg-slate-800 rounded-full h-2.5 overflow-hidden">
+            <div id="progressBar" class="bg-gradient-to-r from-amber-500 to-emerald-400 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+          </div>
+          <button onclick="revealEntireBoard()" class="text-xs text-slate-500 hover:text-slate-300 underline">
+            老師全卷揭曉
+          </button>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- 右側：班級小組競賽看板與提示清單分頁 (佔 4 欄) -->
+    <section class="xl:col-span-4 flex flex-col space-y-5">
+
+      <!-- 小組積分與搶答輪盤看板 -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
+          <div class="flex items-center space-x-2">
+            <span class="text-xl">🏆</span>
+            <h2 class="font-black text-base text-white">小組競賽計分板</h2>
+          </div>
+          <!-- 隨機抽組輪盤按鈕 -->
+          <div class="flex items-center space-x-2">
+            <button onclick="pickRandomTeam()" class="text-xs bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 px-2.5 py-1 rounded-lg font-bold transition flex items-center space-x-1">
+              <i class="fas fa-dice"></i>
+              <span>抽籤小組</span>
+            </button>
+            <div class="flex items-center space-x-1">
+              <button onclick="changeTeamCount(-1)" class="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 text-xs font-bold">-</button>
+              <span id="teamCountBadge" class="text-xs font-bold text-slate-300 w-7 text-center">6組</span>
+              <button onclick="changeTeamCount(1)" class="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 text-xs font-bold">+</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 小組列表動態卡片網格 -->
+        <div id="teamsScoreGrid" class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-2 gap-2.5 max-h-56 overflow-y-auto p-1">
+          <!-- 動態由 JavaScript 渲染 -->
+        </div>
+
+        <div class="mt-3 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
+          <span>點選組別可設為「當前搶答組」</span>
+          <button onclick="resetScores()" class="hover:text-rose-400 transition">清空分數</button>
+        </div>
+      </div>
+
+      <!-- 提示清單分頁 (橫向提示 Across & 縱向提示 Down) -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col flex-1 min-h-[500px]">
+        
+        <!-- 分頁切換按鈕 -->
+        <div class="grid grid-cols-2 gap-2 p-1 bg-slate-950 rounded-xl border border-slate-800 mb-3">
+          <button onclick="switchClueTab('across')" id="tabAcrossBtn" class="py-2 text-xs md:text-sm font-black rounded-lg transition bg-amber-500 text-slate-950 shadow">
+            橫格提示 (Across)
+          </button>
+          <button onclick="switchClueTab('down')" id="tabDownBtn" class="py-2 text-xs md:text-sm font-bold text-slate-400 hover:text-slate-200 rounded-lg transition">
+            縱格提示 (Down)
+          </button>
+        </div>
+
+        <!-- 橫格提示清單 -->
+        <div id="cluesAcrossList" class="space-y-2 overflow-y-auto max-h-[550px] pr-1">
+          <!-- 動態渲染橫向題目 -->
+        </div>
+
+        <!-- 縱格提示清單 -->
+        <div id="cluesDownList" class="space-y-2 overflow-y-auto max-h-[550px] pr-1 hidden">
+          <!-- 動態渲染縱向題目 -->
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- 課堂作答互動輸入彈窗 (避免輸入法干擾，支援單字點擊或整詞送出) -->
+  <div id="inputModal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-700 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center space-x-2">
+          <span id="modalClueTag" class="bg-amber-500 text-slate-950 px-2.5 py-0.5 rounded-lg text-xs font-black">
+            橫向 一
+          </span>
+          <h3 class="text-base font-bold text-white">小組搶答確認</h3>
+        </div>
+        <button onclick="closeInputModal()" class="text-slate-400 hover:text-white text-lg">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+
+      <div>
+        <p id="modalClueDesc" class="text-sm text-slate-300 leading-relaxed font-medium mb-3">
+          提示文字內容載入中...
+        </p>
+
+        <label class="block text-xs font-bold text-slate-400 mb-1.5">
+          請輸入小組答案（詞長：<span id="modalWordLength" class="text-amber-400">4</span> 個中文字）：
+        </label>
+        <div class="flex items-center space-x-2">
+          <input type="text" id="modalAnswerInput" placeholder="在此輸入中文字詞..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-lg font-black text-amber-300 focus:outline-none focus:border-amber-400 tracking-wider">
+          <button onclick="submitModalAnswer()" class="px-5 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-base whitespace-nowrap transition shadow-lg shadow-emerald-500/20">
+            送出核對
+          </button>
+        </div>
+      </div>
+
+      <!-- 快速拆解拼字按鈕（專門提供給在電子白板觸控操作的同學） -->
+      <div class="pt-2">
+        <span class="text-xs text-slate-400 block mb-1.5 font-bold">觸控白板快速候選字庫：</span>
+        <div id="modalLetterPool" class="flex flex-wrap gap-1.5 p-2 bg-slate-950/80 rounded-xl border border-slate-800 max-h-24 overflow-y-auto">
+          <!-- 動態載入混淆字元提供點選 -->
+        </div>
+      </div>
+
+      <div class="flex justify-between items-center pt-2 text-xs border-t border-slate-800">
+        <span class="text-slate-500">回答正確將自動為【當前選定小組】加 10 分！</span>
+        <button onclick="revealActiveWord(false); closeInputModal();" class="text-amber-400 hover:underline">
+          跳過並直接公佈解答
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 一般自訂通知彈窗 -->
+  <div id="alertModal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full p-5 text-center space-y-4 shadow-2xl">
+      <div id="alertIcon" class="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto text-xl">
+        <i class="fas fa-check"></i>
+      </div>
+      <h4 id="alertTitle" class="text-lg font-bold text-white">通知</h4>
+      <p id="alertMessage" class="text-xs text-slate-300 leading-relaxed"></p>
+      <button onclick="closeAlertModal()" class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition">
+        確定
+      </button>
+    </div>
+  </div>
+
+  <!-- 頁尾宣告 -->
+  <footer class="bg-slate-950 border-t border-slate-900 text-center py-2.5 px-4 text-[11px] text-slate-600">
+    <div class="max-w-[1920px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-1">
+      <div>國中公民第五課「個人與家庭的經濟活動」理財與投資教學投屏輔助工具</div>
+      <div>金融基礎教育教材協作版 ｜ 支援 86 吋觸控電子黑板雙向即時操作</div>
+    </div>
+  </footer>
+
+  <script>
+    /* =========================================================================
+     *  題庫資料結構：
+     *  Level 1: 忠實還原使用者上傳的《第五冊 第五課 成果單》經典十字棋盤
+     *  Level 2: 現代金融素養與投資工具挑戰版
+     * ========================================================================= */
+    const PUZZLE_LEVELS = {
+      // 關卡一：國中公民第五課・個人家庭與理財經典版 (對應上傳 PDF 成果單)
+      lesson5: {
+        id: 'lesson5',
+        title: '關卡一：第五冊第五課・公民與理財經典版',
+        rows: 15,
+        cols: 11,
+        // 所有詞彙定位與線索定義
+        words: [
+          // 橫向提示 (Across)
+          { id: 'A1', num: '一', dir: 'across', r: 2, c: 7, word: '基本工資', clue: '維持勞工最低生活水準的工資。' },
+          { id: 'A2', num: '二', dir: 'across', r: 3, c: 5, word: '保釋金', clue: '犯罪嫌疑人繳交給法庭的現金，可以換取部分人身自由。' },
+          { id: 'A3', num: '三', dir: 'across', r: 4, c: 2, word: '分散風險', clue: '不要將所有的雞蛋放在同一個籃子裡。' },
+          { id: 'A4', num: '四', dir: 'across', r: 5, c: 8, word: '代理商', clue: '代理外國商品進口之一切事務的貿易商。' },
+          { id: 'A5', num: '五', dir: 'across', r: 6, c: 0, word: '經濟財', clue: '需要花錢買的物品，與自由財空氣、陽光不同。' },
+          { id: 'A6', num: '六', dir: 'across', r: 7, c: 4, word: '電線桿', clue: '用來把電纜架起以方便電力或電信遠距離傳輸的構造物。' },
+          { id: 'A7', num: '七', dir: 'across', r: 9, c: 6, word: '理財', clue: '對金錢加以規劃和管理。' },
+          { id: 'A8', num: '八', dir: 'across', r: 11, c: 3, word: '就業保險法', clue: '規定凡符合一定條件的勞工，在失業時可向各縣市政府申請失業給付的法律。' },
+          { id: 'A9', num: '九', dir: 'across', r: 14, c: 2, word: '民法', clue: '對男性與女性擁有相同遺產繼承權規定的法律。' },
+          { id: 'A10', num: '十', dir: 'across', r: 12, c: 7, word: '人力資源', clue: '生產要素的一種如工程師、老師等。' },
+
+          // 縱向提示 (Down)
+          { id: 'D1', num: '1', dir: 'down', r: 0, c: 7, word: '共同基金', clue: '投資人將自己的資金交由專業經理人代為管理操作的理財工具，風險比股票低。' },
+          { id: 'D2', num: '2', dir: 'down', r: 2, c: 9, word: '工作倫理', clue: '從業人員在職場中對其所任工作應遵循的規範，如服從、保密。' },
+          { id: 'D3', num: '3', dir: 'down', r: 3, c: 5, word: '保險', clue: '一人有難，大家平攤，是以貨幣形式平攤的社會風險轉嫁機制。' },
+          { id: 'D4', num: '4', dir: 'down', r: 4, c: 2, word: '分別財產制', clue: '夫妻財產的一種方式，將夫妻之財產完全分離，無共有財產。' },
+          { id: 'D5', num: '5', dir: 'down', r: 4, c: 0, word: '家庭經濟', clue: '對於家庭的收入或支出，事先妥善規劃，以便做出有效的利用。' },
+          { id: 'D6', num: '6', dir: 'down', r: 4, c: 4, word: '風力發電', clue: '利用風來產生電力。' },
+          { id: 'D7', num: '7', dir: 'down', r: 6, c: 6, word: '槓桿原理', clue: '阿基米德說：只要給我一個支點，給我一根足夠長的槓桿，我也可以推動地球。' },
+          { id: 'D8', num: '8', dir: 'down', r: 5, c: 10, word: '商品貨幣', clue: '以貝殼、金屬等商品作為交易的媒介。' },
+          { id: 'D9', num: '9', dir: 'down', r: 11, c: 3, word: '就地正法', clue: '在犯罪所在地執行死刑。' },
+          { id: 'D10', num: '10', dir: 'down', r: 10, c: 4, word: '失業', clue: '具備工作能力和意願，又有找工作的具體行動，卻無法獲得工作。' },
+          { id: 'D11', num: '11', dir: 'down', r: 9, c: 7, word: '財團法人', clue: '基金會、私立學校等私法人的一種。' },
+          { id: 'D12', num: '12', dir: 'down', r: 11, c: 10, word: '開源節流', clue: '增加家庭收入新管道和節省家庭支出。' }
+        ]
+      },
+
+      // 關卡二：現代金融與投資工具挑戰版 (全面深耕金融教育概念)
+      advanced_finance: {
+        id: 'advanced_finance',
+        title: '關卡二：現代金融與投資工具挑戰版',
+        rows: 11,
+        cols: 11,
+        words: [
+          // 橫向
+          { id: 'A1', num: '一', dir: 'across', r: 1, c: 1, word: '資產配置', clue: '將資金分散投資於股票、債券、現金等不同商品，以降低波動風險。' },
+          { id: 'A2', num: '二', dir: 'across', r: 3, c: 3, word: '通貨膨脹', clue: '商品與服務的整體價格水準持續上漲，導致貨幣購買力縮水。' },
+          { id: 'A3', num: '三', dir: 'across', r: 5, c: 1, word: '股票市場', clue: '企業公開發行股權募集資金、投資人進行買賣轉讓的交易場所。' },
+          { id: 'A4', num: '四', dir: 'across', r: 7, c: 3, word: '複利效應', clue: '將前期獲得的利息或收益滾入本金繼續生息，被愛因斯坦譽為世界第八大奇蹟。' },
+          { id: 'A5', num: '五', dir: 'across', r: 9, c: 5, word: '緊急預備金', clue: '用以應付突發失業、重大疾病等意外事故，建議儲備3至6個月生活費。' },
+
+          // 縱向
+          { id: 'D1', num: '1', dir: 'down', r: 1, c: 1, word: '資本主義', clue: '以私有制為基礎，生產要素由私人擁有並依市場價格機制運作的經濟制度。' },
+          { id: 'D2', num: '2', dir: 'down', r: 1, c: 4, word: '配置原則', clue: '理財規劃時應依個人年齡、目標與風險承受度訂定的配置準據。' },
+          { id: 'D3', num: '3', dir: 'down', r: 3, c: 3, word: '通常利息', clue: '將資金借貸給他人或存放在銀行機構所定期收取的固定回報。' },
+          { id: 'D4', num: '4', dir: 'down', r: 4, c: 7, word: '證券交易所', clue: '集中撮合買賣雙方進行公開上市證券交易之合法專責機構。' },
+          { id: 'D5', num: '5', dir: 'down', r: 6, c: 9, word: '金錢觀念', clue: '個人對獲取、消費、儲蓄與分享財富的根本態度與生活哲學。' }
+        ]
+      },
+
+      // 關卡三：投資風險、理財工具與防詐陷阱挑戰版 (聚焦詐騙型態、風控與金融法制)
+      fraud_and_risk: {
+        id: 'fraud_and_risk',
+        title: '關卡三：投資風險、理財工具與防詐陷阱挑戰版',
+        rows: 11,
+        cols: 12,
+        words: [
+          // 橫向提示 (Across)
+          { id: 'A1', num: '一', dir: 'across', r: 0, c: 6, word: '警示帳戶', clue: '被通報涉及詐騙犯罪，遭金融機構全面凍結存提款與匯款功能的受列管帳戶。' },
+          { id: 'A2', num: '二', dir: 'across', r: 1, c: 2, word: '保證獲利', clue: '宣稱「穩賺不賠、零風險」的促銷話術，是各類金融投資詐騙最典型的誘餌。' },
+          { id: 'A3', num: '三', dir: 'across', r: 3, c: 5, word: '風險控管', clue: '投資過程中設定停損、部位管理等用以控制不確定損失的一切防範策略。' },
+          { id: 'A4', num: '四', dir: 'across', r: 4, c: 2, word: '資產避險', clue: '運用反向操作或衍生性工具來降低投資組合面臨的市場波動與下跌損失。' },
+          { id: 'A5', num: '五', dir: 'across', r: 5, c: 7, word: '公開說明書', clue: '募集發行有價證券時，依法必須向大眾詳細揭露公司財務業務與風險的法定文件。' },
+          { id: 'A6', num: '六', dir: 'across', r: 6, c: 0, word: '電信詐欺', clue: '利用電話、簡訊或通訊軟體等管道誘騙民眾轉帳匯款的非面對面詐財犯罪。' },
+          { id: 'A7', num: '七', dir: 'across', r: 7, c: 0, word: '龐氏騙局', clue: '假借高額投資獲利吸金，實質是用後加入者的本金支付前人利息的經典騙術。' },
+          { id: 'A8', num: '八', dir: 'across', r: 7, c: 7, word: '內線交易', clue: '公司內部人利用尚未公開但會影響股價之重大消息買賣股票的不法行為。' },
+          { id: 'A9', num: '九', dir: 'across', r: 8, c: 2, word: '集中市場', clue: '透過證券交易所電腦系統撮合買賣雙方進行標準化股票交易的公開交易場所。' },
+          { id: 'A10', num: '十', dir: 'across', r: 9, c: 7, word: '人頭帳戶', clue: '提供存摺與提款卡供他人使用，常遭詐騙集團利用作為收受贓款洗錢的共犯帳號。' },
+          { id: 'A11', num: '十一', dir: 'across', r: 10, c: 3, word: '停損點', clue: '投資前預先設定能承受之最大虧損比例，跌破此價位立即賣出以保全資金。' },
+
+          // 縱向提示 (Down)
+          { id: 'D1', num: '1', dir: 'down', r: 0, c: 8, word: '帳務監管', clue: '金融機構落實洗錢防制與反詐騙，對異常大額金流進行系統監控與風控通報的機制。' },
+          { id: 'D2', num: '2', dir: 'down', r: 1, c: 2, word: '保本投資', clue: '承諾到期時能全額收回原始本金的保守型理財商品，通常報酬率極低。' },
+          { id: 'D3', num: '3', dir: 'down', r: 1, c: 3, word: '證券資產', clue: '投資人持有的股票、債券或受益憑證等各類有價證券形式之金融財富總稱。' },
+          { id: 'D4', num: '4', dir: 'down', r: 1, c: 5, word: '利率風險', clue: '市場基準利率變動導致債券價格或借貸利息成本波動的不確定性。' },
+          { id: 'D5', num: '5', dir: 'down', r: 3, c: 7, word: '控股公司', clue: '以持有其他公司股權並掌控其經營決策為主要業務目的的母企業組織。' },
+          { id: 'D6', num: '6', dir: 'down', r: 6, c: 2, word: '詐騙集團', clue: '透過飆股群組、假交友等手法，分工嚴密誘騙民眾財產的組織性犯罪團夥。' },
+          { id: 'D7', num: '7', dir: 'down', r: 7, c: 5, word: '市場熱點', clue: '吸引大量市場資金關注與追逐的熱門產業或飆漲題材股票。' },
+          { id: 'D8', num: '8', dir: 'down', r: 7, c: 7, word: '內部人', clue: '董監事與重要經理人等能最先獲知公司尚未公開核心重大資訊的人員。' },
+          { id: 'D9', num: '9', dir: 'down', r: 7, c: 9, word: '交易帳戶', clue: '投資人於金融機構開立，用以進行證券交割與款項收付的專用帳戶。' }
+        ]
+      }
+    };
+
+    /* =========================================================================
+     *  系統全域狀態管理
+     * ========================================================================= */
+    let currentLevelKey = 'lesson5';
+    let currentPuzzle = PUZZLE_LEVELS[currentLevelKey];
+
+    // 格子狀態映射表 key: "r_c" -> { char: '基', filled: false, currentVal: '', words: [wordId1, wordId2], isStart: bool, label: '一/1' }
+    let gridMap = {};
+    let activeWord = null;   // 當前選取的高亮詞彙物件
+    let activeCell = null;   // 當前選取的單格 { r, c }
+    let activeTab = 'across'; // 'across' 或 'down'
+
+    // 小組競賽狀態
+    let gameState = {
+      soundEnabled: true,
+      activeTeamIndex: 0,
+      timerDuration: 30,
+      timerRemaining: 30,
+      timerInterval: null,
+      isTimerRunning: false,
+      teams: [
+        { id: 1, name: '第 1 組', score: 0 },
+        { id: 2, name: '第 2 組', score: 0 },
+        { id: 3, name: '第 3 組', score: 0 },
+        { id: 4, name: '第 4 組', score: 0 },
+        { id: 5, name: '第 5 組', score: 0 },
+        { id: 6, name: '第 6 組', score: 0 }
+      ]
+    };
+
+    /* Tone.js 音效合成器 */
+    let synths = {};
+    function initAudio() {
+      if (!synths.main && window.Tone) {
+        try {
+          synths.main = new Tone.PolySynth(Tone.Synth).toDestination();
+          synths.main.volume.value = -6;
+
+          synths.chime = new Tone.MembraneSynth().toDestination();
+          synths.chime.volume.value = -4;
+        } catch (e) {
+          console.log("Audio waiting for user gesture");
+        }
+      }
+    }
+
+    function playSound(type) {
+      if (!gameState.soundEnabled || !window.Tone) return;
+      initAudio();
+      try {
+        if (Tone.context.state !== 'running') {
+          Tone.start();
+        }
+        const now = Tone.now();
+        if (type === 'tap') {
+          synths.main.triggerAttackRelease('C5', '32n', now);
+        } else if (type === 'correct') {
+          synths.main.triggerAttackRelease(['E5', 'G5', 'C6'], '16n', now);
+        } else if (type === 'victory') {
+          synths.main.triggerAttackRelease(['C5', 'E5', 'G5', 'B5', 'C6'], '8n', now);
+        } else if (type === 'error') {
+          synths.chime.triggerAttackRelease('A2', '16n', now);
+        } else if (type === 'timeout') {
+          synths.chime.triggerAttackRelease('C2', '8n', now);
+        }
+      } catch (err) {
+        console.warn(err);
+      }
+    }
+
+    function toggleSound() {
+      gameState.soundEnabled = !gameState.soundEnabled;
+      const icon = document.getElementById('soundIcon');
+      if (gameState.soundEnabled) {
+        icon.className = 'fas fa-volume-up';
+        showAlert('音效通知', '遊戲音效已開啟！');
+      } else {
+        icon.className = 'fas fa-volume-mute';
+        showAlert('音效通知', '遊戲音效已靜音。');
+      }
+    }
+
+    /* =========================================================================
+     *  建立棋盤資料結構與格位交集解析
+     * ========================================================================= */
+    function buildBoardData() {
+      gridMap = {};
+
+      currentPuzzle.words.forEach(w => {
+        w.isSolved = false; // 是否全詞已解開
+        const chars = Array.from(w.word);
+
+        chars.forEach((ch, idx) => {
+          const row = w.dir === 'across' ? w.r : w.r + idx;
+          const col = w.dir === 'across' ? w.c + idx : w.c;
+          const key = `${row}_${col}`;
+
+          if (!gridMap[key]) {
+            gridMap[key] = {
+              r: row,
+              c: col,
+              char: ch,
+              currentVal: '',
+              words: [],
+              isStart: false,
+              labels: []
+            };
+          }
+
+          gridMap[key].words.push(w.id);
+
+          // 若為詞彙開頭格，記錄標籤
+          if (idx === 0) {
+            gridMap[key].isStart = true;
+            gridMap[key].labels.push({
+              dir: w.dir,
+              num: w.num
+            });
+          }
+        });
+      });
+    }
+
+    /* =========================================================================
+     *  繪製棋盤 DOM 網格
+     * ========================================================================= */
+    function renderBoardDOM() {
+      const container = document.getElementById('crosswordGrid');
+      container.innerHTML = '';
+
+      // 設定 Grid 行列數
+      container.style.gridTemplateColumns = `repeat(${currentPuzzle.cols}, minmax(0, 1fr))`;
+
+      for (let r = 0; r < currentPuzzle.rows; r++) {
+        for (let c = 0; c < currentPuzzle.cols; c++) {
+          const key = `${r}_${c}`;
+          const cellData = gridMap[key];
+
+          const cellEl = document.createElement('div');
+          cellEl.id = `cell_${r}_${c}`;
+          cellEl.dataset.r = r;
+          cellEl.dataset.c = c;
+
+          if (!cellData) {
+            // 空白不可填格子
+            cellEl.className = "w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 bg-slate-950/40 rounded-xl opacity-20 border border-slate-900 pointer-events-none";
+          } else {
+            // 可填寫題目格子
+            cellEl.className = "w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 bg-slate-850 hover:bg-slate-750 bg-slate-800 border-2 border-slate-700 hover:border-amber-400 rounded-xl flex items-center justify-center font-black text-lg md:text-2xl text-white relative cursor-pointer transition transform active:scale-95 shadow-md";
+            
+            // 標示起點提示編號 (例如 一, 1)
+            if (cellData.isStart) {
+              const labelText = cellData.labels.map(l => l.num).join('/');
+              const badge = document.createElement('span');
+              badge.className = "absolute top-0.5 left-1 text-[9px] md:text-[10px] font-mono font-black text-amber-400 leading-none select-none pointer-events-none";
+              badge.innerText = labelText;
+              cellEl.appendChild(badge);
+            }
+
+            // 填字內文容器
+            const charSpan = document.createElement('span');
+            charSpan.id = `char_${r}_${c}`;
+            charSpan.className = "select-none";
+            charSpan.innerText = cellData.currentVal || '';
+            cellEl.appendChild(charSpan);
+
+            // 綁定點選事件
+            cellEl.onclick = () => onCellClicked(r, c);
+          }
+
+          container.appendChild(cellEl);
+        }
+      }
+
+      updateBoardVisualHighlights();
+      updateProgressBar();
+    }
+
+    /* =========================================================================
+     *  點選格子與選取詞彙切換邏輯
+     * ========================================================================= */
+    function onCellClicked(r, c) {
+      playSound('tap');
+      const key = `${r}_${c}`;
+      const cellData = gridMap[key];
+      if (!cellData) return;
+
+      activeCell = { r, c };
+
+      // 若該格屬於多個詞彙（交叉十字點），優先切換當前方向或選第一個
+      if (cellData.words.length === 1) {
+        setActiveWordById(cellData.words[0]);
+      } else {
+        // 如果當前已有 activeWord 且包含這格，若再點一次則切換到另一個方向
+        if (activeWord && cellData.words.includes(activeWord.id)) {
+          const otherWordId = cellData.words.find(id => id !== activeWord.id);
+          if (otherWordId) {
+            setActiveWordById(otherWordId);
+          }
+        } else {
+          // 優先匹配目前開啟的 Tab 方向
+          const matchedDirWord = cellData.words.map(id => currentPuzzle.words.find(w => w.id === id))
+                                             .find(w => w.dir === activeTab);
+          setActiveWordById(matchedDirWord ? matchedDirWord.id : cellData.words[0]);
+        }
+      }
+    }
+
+    function setActiveWordById(wordId) {
+      const w = currentPuzzle.words.find(item => item.id === wordId);
+      if (!w) return;
+      activeWord = w;
+
+      // 切換對應的提示分頁
+      if (w.dir !== activeTab) {
+        switchClueTab(w.dir);
+      }
+
+      // 更新大標題面板文字
+      const badge = document.getElementById('activeClueBadge');
+      badge.innerText = `${w.dir === 'across' ? '橫向' : '縱向'} ${w.num}`;
+      badge.className = w.dir === 'across' ? 'bg-amber-500 text-slate-950 font-black text-xs md:text-sm px-3 py-1.5 rounded-xl whitespace-nowrap shadow' : 'bg-sky-500 text-slate-950 font-black text-xs md:text-sm px-3 py-1.5 rounded-xl whitespace-nowrap shadow';
+
+      document.getElementById('activeClueText').innerText = `${w.num}、${w.clue}`;
+
+      // 計算已填入字數
+      let filledCount = 0;
+      const chars = Array.from(w.word);
+      chars.forEach((ch, idx) => {
+        const row = w.dir === 'across' ? w.r : w.r + idx;
+        const col = w.dir === 'across' ? w.c + idx : w.c;
+        if (gridMap[`${row}_${col}`].currentVal) filledCount++;
+      });
+      document.getElementById('activeClueMeta').innerText = `詞長：${chars.length} 個字 ｜ 已填寫：${filledCount} / ${chars.length} ${w.isSolved ? '（已完全解開 ✨）' : ''}`;
+
+      updateBoardVisualHighlights();
+      highlightActiveClueItem(w.id);
+    }
+
+    /* 更新棋盤格子的色彩高亮 */
+    function updateBoardVisualHighlights() {
+      if (!activeWord) return;
+
+      // 清除所有格子選取樣式
+      currentPuzzle.words.forEach(w => {
+        const chars = Array.from(w.word);
+        chars.forEach((ch, idx) => {
+          const row = w.dir === 'across' ? w.r : w.r + idx;
+          const col = w.dir === 'across' ? w.c + idx : w.c;
+          const el = document.getElementById(`cell_${row}_${col}`);
+          if (el) {
+            el.classList.remove('bg-amber-500/25', 'border-amber-400', 'cell-glow', 'bg-sky-500/20', 'border-sky-400');
+          }
+        });
+      });
+
+      // 為當前詞彙的所有格子添加高亮
+      const chars = Array.from(activeWord.word);
+      chars.forEach((ch, idx) => {
+        const row = activeWord.dir === 'across' ? activeWord.r : activeWord.r + idx;
+        const col = activeWord.dir === 'across' ? activeWord.c + idx : activeWord.c;
+        const el = document.getElementById(`cell_${row}_${col}`);
+        if (el) {
+          if (activeWord.dir === 'across') {
+            el.classList.add('bg-amber-500/25', 'border-amber-400');
+          } else {
+            el.classList.add('bg-sky-500/20', 'border-sky-400');
+          }
+          if (activeCell && activeCell.r === row && activeCell.c === col) {
+            el.classList.add('cell-glow');
+          }
+        }
+      });
+    }
+
+    /* =========================================================================
+     *  渲染提示列表清單 (橫向與縱向)
+     * ========================================================================= */
+    function renderCluesDOM() {
+      const acrossContainer = document.getElementById('cluesAcrossList');
+      const downContainer = document.getElementById('cluesDownList');
+      acrossContainer.innerHTML = '';
+      downContainer.innerHTML = '';
+
+      currentPuzzle.words.forEach(w => {
+        const card = document.createElement('div');
+        card.id = `clue_item_${w.id}`;
+        card.className = "p-3 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 cursor-pointer transition flex items-start space-x-2.5 text-xs md:text-sm";
+        card.onclick = () => {
+          setActiveWordById(w.id);
+          playSound('tap');
+        };
+
+        const tag = document.createElement('span');
+        tag.className = w.dir === 'across' 
+          ? "w-6 h-6 rounded-lg bg-amber-500 text-slate-950 font-black flex items-center justify-center text-xs flex-shrink-0"
+          : "w-6 h-6 rounded-lg bg-sky-500 text-slate-950 font-black flex items-center justify-center text-xs flex-shrink-0";
+        tag.innerText = w.num;
+
+        const content = document.createElement('div');
+        content.className = "flex-1";
+        content.innerHTML = `
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-slate-200">${w.clue}</span>
+            <span class="text-[11px] text-slate-500 font-mono ml-2">${w.word.length}字</span>
+          </div>
+        `;
+
+        card.appendChild(tag);
+        card.appendChild(content);
+
+        if (w.dir === 'across') {
+          acrossContainer.appendChild(card);
+        } else {
+          downContainer.appendChild(card);
+        }
+      });
+    }
+
+    function switchClueTab(tab) {
+      activeTab = tab;
+      const acrossBtn = document.getElementById('tabAcrossBtn');
+      const downBtn = document.getElementById('tabDownBtn');
+      const acrossList = document.getElementById('cluesAcrossList');
+      const downList = document.getElementById('cluesDownList');
+
+      if (tab === 'across') {
+        acrossBtn.className = "py-2 text-xs md:text-sm font-black rounded-lg transition bg-amber-500 text-slate-950 shadow";
+        downBtn.className = "py-2 text-xs md:text-sm font-bold text-slate-400 hover:text-slate-200 rounded-lg transition";
+        acrossList.classList.remove('hidden');
+        downList.classList.add('hidden');
+      } else {
+        downBtn.className = "py-2 text-xs md:text-sm font-black rounded-lg transition bg-sky-500 text-slate-950 shadow";
+        acrossBtn.className = "py-2 text-xs md:text-sm font-bold text-slate-400 hover:text-slate-200 rounded-lg transition";
+        downList.classList.remove('hidden');
+        acrossList.classList.add('hidden');
+      }
+    }
+
+    function highlightActiveClueItem(wordId) {
+      document.querySelectorAll('[id^="clue_item_"]').forEach(el => {
+        el.classList.remove('ring-2', 'ring-amber-400', 'bg-slate-700', 'ring-sky-400');
+      });
+      const activeItem = document.getElementById(`clue_item_${wordId}`);
+      if (activeItem) {
+        activeItem.classList.add('ring-2', activeTab === 'across' ? 'ring-amber-400' : 'ring-sky-400', 'bg-slate-700');
+        activeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+
+    /* =========================================================================
+     *  作答認證、揭曉與計分回饋邏輯
+     * ========================================================================= */
+    function revealActiveWord(awardPoints = true) {
+      if (!activeWord) {
+        showAlert('請先點選題目', '請先點選棋盤格子或右側提示選定一道題！');
+        return;
+      }
+
+      const chars = Array.from(activeWord.word);
+      chars.forEach((ch, idx) => {
+        const row = activeWord.dir === 'across' ? activeWord.r : activeWord.r + idx;
+        const col = activeWord.dir === 'across' ? activeWord.c + idx : activeWord.c;
+        const key = `${row}_${col}`;
+        gridMap[key].currentVal = ch;
+
+        const charSpan = document.getElementById(`char_${row}_${col}`);
+        if (charSpan) {
+          charSpan.innerText = ch;
+        }
+        const cellEl = document.getElementById(`cell_${row}_${col}`);
+        if (cellEl) {
+          cellEl.classList.add('cell-correct', 'bg-emerald-950/80', 'border-emerald-500', 'text-emerald-300');
+        }
+      });
+
+      activeWord.isSolved = true;
+      markClueItemCompleted(activeWord.id);
+      playSound('correct');
+
+      // 小組加分
+      if (awardPoints && gameState.teams.length > 0) {
+        const team = gameState.teams[gameState.activeTeamIndex];
+        team.score += 10;
+        renderTeamsScores();
+        confetti({
+          particleCount: 50,
+          spread: 60,
+          origin: { y: 0.8 }
+        });
+        showAlert('回答正確！🎉', `${team.name} 搶答成功，加 10 分！\n本題答案為：【${activeWord.word}】`);
+      }
+
+      updateProgressBar();
+      checkAllSolved();
+    }
+
+    function giveHintActiveWord() {
+      if (!activeWord) return;
+      const chars = Array.from(activeWord.word);
+      // 找出第一個尚未填寫的字進行揭曉
+      for (let idx = 0; idx < chars.length; idx++) {
+        const row = activeWord.dir === 'across' ? activeWord.r : activeWord.r + idx;
+        const col = activeWord.dir === 'across' ? activeWord.c + idx : activeWord.c;
+        const key = `${row}_${col}`;
+        if (!gridMap[key].currentVal) {
+          gridMap[key].currentVal = chars[idx];
+          const charSpan = document.getElementById(`char_${row}_${col}`);
+          if (charSpan) charSpan.innerText = chars[idx];
+          playSound('tap');
+          showAlert('提示揭曉', `已在第 ${idx + 1} 格填入提示字：【${chars[idx]}】`);
+          return;
+        }
+      }
+      showAlert('提示', '本詞彙的所有文字均已揭曉！');
+    }
+
+    function markClueItemCompleted(wordId) {
+      const item = document.getElementById(`clue_item_${wordId}`);
+      if (item) {
+        item.classList.add('opacity-40', 'line-through');
+        const badge = item.querySelector('span');
+        if (badge) {
+          badge.innerHTML = '<i class="fas fa-check text-[10px]"></i>';
+          badge.className = "w-6 h-6 rounded-lg bg-emerald-500 text-slate-950 font-black flex items-center justify-center text-xs flex-shrink-0";
+        }
+      }
+    }
+
+    function updateProgressBar() {
+      const totalWords = currentPuzzle.words.length;
+      let solvedCount = currentPuzzle.words.filter(w => {
+        const chars = Array.from(w.word);
+        return chars.every((ch, idx) => {
+          const row = w.dir === 'across' ? w.r : w.r + idx;
+          const col = w.dir === 'across' ? w.c + idx : w.c;
+          return gridMap[`${row}_${col}`].currentVal === ch;
+        });
+      }).length;
+
+      document.getElementById('progressText').innerText = `${solvedCount} / ${totalWords} 題完成`;
+      const pct = (solvedCount / totalWords) * 100;
+      document.getElementById('progressBar').style.width = `${pct}%`;
+    }
+
+    function checkAllSolved() {
+      const allSolved = currentPuzzle.words.every(w => {
+        const chars = Array.from(w.word);
+        return chars.every((ch, idx) => {
+          const row = w.dir === 'across' ? w.r : w.r + idx;
+          const col = w.dir === 'across' ? w.c + idx : w.c;
+          return gridMap[`${row}_${col}`].currentVal === ch;
+        });
+      });
+
+      if (allSolved) {
+        playSound('victory');
+        confetti({
+          particleCount: 150,
+          spread: 100,
+          origin: { y: 0.5 }
+        });
+        setTimeout(() => {
+          showAlert('🏆 全盤大獲全勝！', '太厲害了！全班同學齊心協力完成所有金融填字題目！\n請老師為各小組頒發獎勵！');
+        }, 600);
+      }
+    }
+
+    function revealEntireBoard() {
+      currentPuzzle.words.forEach(w => {
+        const chars = Array.from(w.word);
+        chars.forEach((ch, idx) => {
+          const row = w.dir === 'across' ? w.r : w.r + idx;
+          const col = w.dir === 'across' ? w.c + idx : w.c;
+          gridMap[`${row}_${col}`].currentVal = ch;
+          const charSpan = document.getElementById(`char_${row}_${col}`);
+          if (charSpan) charSpan.innerText = ch;
+        });
+        w.isSolved = true;
+        markClueItemCompleted(w.id);
+      });
+      updateProgressBar();
+      playSound('correct');
+      showAlert('老師解答揭曉', '已為全班揭開本關卡的所有字詞解答。');
+    }
+
+    /* =========================================================================
+     *  小組計分面板與輪盤管理
+     * ========================================================================= */
+    function renderTeamsScores() {
+      const container = document.getElementById('teamsScoreGrid');
+      container.innerHTML = '';
+
+      gameState.teams.forEach((t, idx) => {
+        const isActive = idx === gameState.activeTeamIndex;
+        const card = document.createElement('div');
+        card.className = `p-2.5 rounded-xl border transition flex items-center justify-between cursor-pointer ${
+          isActive 
+            ? 'bg-amber-500/20 border-amber-400 ring-2 ring-amber-400/50 shadow-md' 
+            : 'bg-slate-800/80 border-slate-700 hover:border-slate-600'
+        }`;
+
+        card.onclick = () => {
+          gameState.activeTeamIndex = idx;
+          renderTeamsScores();
+          playSound('tap');
+        };
+
+        card.innerHTML = `
+          <div>
+            <div class="flex items-center space-x-1.5">
+              <span class="w-5 h-5 rounded bg-slate-900 text-amber-300 flex items-center justify-center text-[10px] font-black">${t.id}</span>
+              <span class="font-black text-xs text-white">${t.name}</span>
+            </div>
+            <span class="font-black text-base text-amber-400 font-mono">${t.score} 分</span>
+          </div>
+          <div class="flex flex-col space-y-1">
+            <button onclick="event.stopPropagation(); updateTeamScore(${idx}, 10)" class="w-6 h-5 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[10px] flex items-center justify-center">+10</button>
+            <button onclick="event.stopPropagation(); updateTeamScore(${idx}, -5)" class="w-6 h-5 rounded bg-rose-600 hover:bg-rose-500 text-white font-black text-[10px] flex items-center justify-center">-5</button>
+          </div>
+        `;
+
+        container.appendChild(card);
+      });
+    }
+
+    function updateTeamScore(idx, delta) {
+      gameState.teams[idx].score += delta;
+      renderTeamsScores();
+      playSound('tap');
+    }
+
+    function changeTeamCount(delta) {
+      const newCount = gameState.teams.length + delta;
+      if (newCount < 2 || newCount > 8) {
+        showAlert('組數限制', '小組競賽建議設置在 2 到 8 組之間！');
+        return;
+      }
+
+      if (delta > 0) {
+        gameState.teams.push({
+          id: newCount,
+          name: `第 ${newCount} 組`,
+          score: 0
+        });
+      } else {
+        gameState.teams.pop();
+        if (gameState.activeTeamIndex >= gameState.teams.length) {
+          gameState.activeTeamIndex = 0;
+        }
+      }
+      document.getElementById('teamCountBadge').innerText = `${gameState.teams.length}組`;
+      renderTeamsScores();
+    }
+
+    function pickRandomTeam() {
+      playSound('tap');
+      let times = 0;
+      const interval = setInterval(() => {
+        gameState.activeTeamIndex = Math.floor(Math.random() * gameState.teams.length);
+        renderTeamsScores();
+        times++;
+        if (times > 10) {
+          clearInterval(interval);
+          playSound('correct');
+          showAlert('🎲 隨機抽組揭曉！', `輪到【${gameState.teams[gameState.activeTeamIndex].name}】進行搶答！請準備！`);
+          resetTimer(30);
+          toggleTimer();
+        }
+      }, 80);
+    }
+
+    function resetScores() {
+      gameState.teams.forEach(t => t.score = 0);
+      renderTeamsScores();
+      showAlert('計分重設', '各組分數已全部歸零。');
+    }
+
+    /* =========================================================================
+     *  搶答倒數計時器
+     * ========================================================================= */
+    function toggleTimer() {
+      if (gameState.isTimerRunning) {
+        clearInterval(gameState.timerInterval);
+        gameState.isTimerRunning = false;
+        document.getElementById('timerIcon').className = 'fas fa-play';
+      } else {
+        gameState.isTimerRunning = true;
+        document.getElementById('timerIcon').className = 'fas fa-pause';
+        gameState.timerInterval = setInterval(() => {
+          gameState.timerRemaining--;
+          updateTimerDisplay();
+          if (gameState.timerRemaining <= 0) {
+            clearInterval(gameState.timerInterval);
+            gameState.isTimerRunning = false;
+            document.getElementById('timerIcon').className = 'fas fa-play';
+            playSound('timeout');
+            showAlert('時間到！⏰', '搶答時間截止！開放其他小組進行搶答偷分！');
+          }
+        }, 1000);
+      }
+    }
+
+    function resetTimer(seconds = 30) {
+      clearInterval(gameState.timerInterval);
+      gameState.isTimerRunning = false;
+      gameState.timerRemaining = seconds;
+      document.getElementById('timerIcon').className = 'fas fa-play';
+      updateTimerDisplay();
+    }
+
+    function updateTimerDisplay() {
+      document.getElementById('timerDisplay').innerText = `${gameState.timerRemaining}s`;
+    }
+
+    /* =========================================================================
+     *  作答輸入彈窗與觸控白板候選字庫
+     * ========================================================================= */
+    function openInputModal() {
+      if (!activeWord) {
+        showAlert('請先點選題目', '請先在棋盤或提示區點選欲作答之題目！');
+        return;
+      }
+
+      document.getElementById('modalClueTag').innerText = `${activeWord.dir === 'across' ? '橫向' : '縱向'} ${activeWord.num}`;
+      document.getElementById('modalClueDesc').innerText = activeWord.clue;
+      document.getElementById('modalWordLength').innerText = activeWord.word.length;
+
+      const input = document.getElementById('modalAnswerInput');
+      input.value = '';
+
+      // 生成觸控白板專用候選字庫（包含正確答案字元與混淆字元）
+      const poolContainer = document.getElementById('modalLetterPool');
+      poolContainer.innerHTML = '';
+
+      const correctChars = Array.from(activeWord.word);
+      const distractorChars = ['資', '金', '險', '基', '理', '財', '經', '風', '利', '商', '保', '法', '投', '貨', '幣', '詐', '騙', '帳', '戶', '控', '損', '內', '市', '警'];
+      const combined = [...correctChars];
+      while (combined.length < 12) {
+        const randCh = distractorChars[Math.floor(Math.random() * distractorChars.length)];
+        if (!combined.includes(randCh)) combined.push(randCh);
+      }
+      // 洗牌
+      combined.sort(() => Math.random() - 0.5);
+
+      combined.forEach(ch => {
+        const btn = document.createElement('button');
+        btn.className = "w-9 h-9 rounded-lg bg-slate-800 hover:bg-amber-500 hover:text-slate-950 font-black text-sm text-slate-200 border border-slate-700 transition flex items-center justify-center";
+        btn.innerText = ch;
+        btn.onclick = () => {
+          input.value += ch;
+          playSound('tap');
+        };
+        poolContainer.appendChild(btn);
+      });
+
+      document.getElementById('inputModal').classList.remove('hidden');
+      setTimeout(() => input.focus(), 100);
+    }
+
+    function closeInputModal() {
+      document.getElementById('inputModal').classList.add('hidden');
+    }
+
+    function submitModalAnswer() {
+      const input = document.getElementById('modalAnswerInput');
+      const val = input.value.trim();
+
+      if (!val) return;
+
+      if (val === activeWord.word) {
+        closeInputModal();
+        revealActiveWord(true);
+      } else {
+        playSound('error');
+        showAlert('答案有誤 ❌', `輸入的【${val}】不正確喔！\n請再仔細思考提示內容，或讓其他小組搶答！`);
+      }
+    }
+
+    /* 支援 Enter 鍵快捷送出 */
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const modal = document.getElementById('inputModal');
+        if (!modal.classList.contains('hidden')) {
+          submitModalAnswer();
+        }
+      }
+    });
+
+    /* =========================================================================
+     *  關卡切換與系統啟動
+     * ========================================================================= */
+    function switchLevel(levelKey) {
+      if (!PUZZLE_LEVELS[levelKey]) return;
+      currentLevelKey = levelKey;
+      currentPuzzle = PUZZLE_LEVELS[levelKey];
+      document.getElementById('levelBadge').innerText = currentPuzzle.title;
+
+      buildBoardData();
+      renderBoardDOM();
+      renderCluesDOM();
+
+      if (currentPuzzle.words.length > 0) {
+        setActiveWordById(currentPuzzle.words[0].id);
+      }
+      playSound('tap');
+    }
+
+    function confirmResetBoard() {
+      buildBoardData();
+      renderBoardDOM();
+      renderCluesDOM();
+      if (currentPuzzle.words.length > 0) {
+        setActiveWordById(currentPuzzle.words[0].id);
+      }
+      showAlert('本局重啟', '棋盤已重置回初始未作答狀態！');
+    }
+
+    function toggleFullScreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        }
+      }
+    }
+
+    function showAlert(title, msg) {
+      document.getElementById('alertTitle').innerText = title;
+      document.getElementById('alertMessage').innerText = msg;
+      document.getElementById('alertModal').classList.remove('hidden');
+    }
+
+    function closeAlertModal() {
+      document.getElementById('alertModal').classList.add('hidden');
+    }
+
+    /* 網頁載入後初始化 */
+    window.onload = function () {
+      buildBoardData();
+      renderBoardDOM();
+      renderCluesDOM();
+      renderTeamsScores();
+      if (currentPuzzle.words.length > 0) {
+        setActiveWordById(currentPuzzle.words[0].id);
+      }
+    };
+  </script>
+</body>
+</html>
